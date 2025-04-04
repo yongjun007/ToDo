@@ -27,4 +27,5 @@ async def update_task():
 # /tasks/3 같은 주소에 DELETE 방식으로 접근하면 이 함수가 실행된다.
 # (예: 3번 할 일을 삭제하는 기능)
 @router.delete("/tasks/{task_id}")
+async def delete_task(task_id: int):
     pass
