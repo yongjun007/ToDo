@@ -124,6 +124,30 @@ async def update_task(
     # * 수정 완료된 Task 객체를 반환함
 
 
+# -----------------------------------------------------------
+# [ 함수: delete_task ]
+# 기존 할 일 [Task] 객체를 받아서 DB에서 삭제하는 함수
+# -----------------------------------------------------------
+
+
+# * 함수 정의: async def ... > 비동기 DB 작업을 위해 async 사용
+# * 매개변수:
+#   - db: 비동기 DB 세션 (AsyncSession)
+#   - original: 삭제할 Task 객체 (이미 DB에서 조회된 상태)
+# * 반환값: 없음 (삭제만 수행하고 결과는 따로 반환하지 않음)
+async def delete_task(db: AsyncSession, original: task_model.Task) -> None:
+    # * db.delete(original):
+    #    - DB 세션에서 해당 Task 객체를 삭제 대상으로 표시함
+    #    - 실제로 삭제되는 건 아니고 "삭제 준비됨" 상태가 됨
+
+    await db.delete(original)
+    # *  await: delete 작업이 완료될 떄까지 기다림 (비동기 방식을 처리)
+
+    await db.commit()
+    # * 실제로 DB에서 데이터를 삭제함
+    #    - commit을 해야 삭제가 최종적으로 반영됨
+
+
 # ---------------------------------------------------------------
 # [ 함수: get_tasks_with_done ]
 # 모든 할 일을 불러오고, 각 할 일이 완료되었는지도 함께 알려주는 함수
@@ -138,8 +162,8 @@ async def get_tasks_with_done(db: AsyncSession) -> list[tuple[int, str, bool]]:
     result: Result = await db.execute(
         # * await: 외부 조인을 포함한 SELECT 쿼리를 DB에 보냄
         select(
-            task_model.Task.id,
-            task_model.Task.title,  # 할일 제목
+            task_model.Task.id,  # 할 일 번호
+            task_model.Task.title,  # 할 일 제목
             task_model.Done.id.is_not(None).label("done"),
             # * Done 테이블에 이 할 일(Task)의 완료 기록이 있으면 > True
             # * Done 테이블에 없으면 > False (아직 완료 안된 상태)
