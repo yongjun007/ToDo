@@ -48,13 +48,20 @@ router = APIRouter()
 # response_model : 응답의 데이터 형태를 지정
 # - 여기서는 Task 모델을 여러개 담은 리스트를 반환한다고 지정함
 async def list_tasks(db: AsyncSession = Depends(get_db)):
+    # * async: 이 함수는 '비동기 함수'임
+    #   - 비동기 함수는 DB와 통신 같은 시간이 오래 걸리는 작업을
+    #     기다리지 않고도 다른 작업을 처리할 수 있게 해줌
+    #   - 덕분에 FastAPI 서버가 동시에 여러 요청을 효율적으로 처리 가능함
+
+    # * await: 시간이 오래 걸리는 작업을 '기다렸다가' 실행을 이어감
+    #   - 여기서는 DB 조회 작업을 기다리는 데 사용함
     return await task_crud.get_tasks_with_done(db)
     # * 실제 DB에서 모든 할 일을 가져오고, 각 할 일이 완료되었는지도 함께 반환함
     # * 완료 여부는 "Done 테이블에 해당 할 일이 있는지"로 판단
     #   (외부 조인이라는 방식으로 처리됨 - 모든 할 일을 보여주되, 완료된 것도 함께 표시함)
 
 
-# -----------------------------------------------------------------
+# ----------------------------------------------------------------
 # [2] 할 일 추가 기능 (POST 요청)
 # - 클라이언트가 JSON 형식으로 보낸 데이터(title)를 받아
 #   새로운 할 일을 생성하는 기능 (예: {"title": "책 읽기"})
@@ -67,30 +74,41 @@ async def create_task(
     task_body: task_schema.TaskCreate, db: AsyncSession = Depends(get_db)
 ):
     return await task_crud.create_task(db, task_body)
-    # * crud 모듈의 create_task() 함수를 호출하여 실제 DB에 저장함
-    # * 저장 후 생성된 할 일(Task)을 반환하며, 그 안에는 id가 포함됨
-    #   (예: TaskCreateResponse(id=1, title="책읽기"))
+    # * DB에 새 Task를 저장하고, id가 포함된 응답 데이터를 반환함
 
 
 # ----------------------------------------------------------------
 # [3] 할 일 수정 기능 (PUT 요청)
 # - 경로에 포함된 번호 (task_id)에 해당하는 할 일을 수정함
 # - 클라이언트가 수정할 내용을 JSON으로 보내면 title을 바꿔주는 역할
+# - 실제 DB에서 해당 Task가 존재하는지 확인한 뒤 수정 진행
 # ----------------------------------------------------------------
 @router.put("/tasks/{task_id}", response_model=task_schema.TaskCreateResponse)
 # - task_id: URL 경로에 포함된 숫자 (수정 대상 할 일 번호)
 # - task_body: 수정할 내용을 담은 요청 본문 (title)
-async def update_task(task_id: int, task_body: task_schema.TaskCreate):
-    return task_schema.TaskCreateResponse(id=task_id, **task_body.model_dump())
-    # * id는 수정 대상 번호 그대로 사용
-    # * 수정된 title과 함께 응답 구조(TaskCreateResponse)로 반환
-    # * model_dump()는 title 값을 딕셔너리처럼 꺼내주는 함수 (dict() 대신 사용됨)
+# - db : FastAPI가 get_db() 함수를 통해 자동으로 주입하는 DB 세션 객체
+async def update_task(
+    task_id: int, task_body: task_schema.TaskCreate, db: AsyncSession = Depends(get_db)
+):
+    task = await task_crud.get_task(db, task_id=task_id)
+    # * DB에서 해당 Task_id에 맞는 Task를 조회함
+
+    # * if: 조건문 > 특정 조건이 참(True)이면 아래 코드를 실행함
+    if task is None:
+        # * raise: 예외(오류)를 의도적으로 발생시킴
+        #   - 여기서는 task가 존재하지 않으면 404 오류를 발생시킴
+        #   - FastAPI는 raise된 HTTPException을 자동으로 처리해서
+        #     클라이언트에 "할 일을 찾을 수 없음"이라는 에러 응답을 보냄
+        raise HTTPException(status_code=404, detail="task not found")
+
+    return await task_crud.update_task(db, task_body, original=task)
+    # * 기존 Task 객체(original)의 title을 수정하고, 수정된 결과를 반환함
 
 
 # ----------------------------------------------------------------
 # [4] 할 일 삭제 기능 (DELETE 요청)
 # - /tasks/번호 형식으로 요청이 오면 해당 번호의 할 일을 삭제함
-# - 이 함수는 아직 DB가 없기 때문에 동작은 하지 않지만 구조만 정의함
+# - 이 함수는 아직 DB와 연결되어 있지 않음(형태만 정의한 상태)
 # ----------------------------------------------------------------
 @router.delete("/tasks/{task_id}")
 # - task_id: 삭제할 할 일의 번호
