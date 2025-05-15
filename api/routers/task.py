@@ -63,18 +63,31 @@ async def list_tasks(db: AsyncSession = Depends(get_db)):
 
 # ----------------------------------------------------------------
 # [2] 할 일 추가 기능 (POST 요청)
-# - 클라이언트가 JSON 형식으로 보낸 데이터(title)를 받아
-#   새로운 할 일을 생성하는 기능 (예: {"title": "책 읽기"})
+# - 사용자가 할 일 하나를 JSON으로 보내면 서버가 저장해줍니다.
+# - 예: {"title": "책 읽기"}
+# - 이 함수는 POST /tasks 주소로 요청이 왔을 때 실행됩니다.
 # -----------------------------------------------------------------
 @router.post("/tasks", response_model=task_schema.TaskCreateResponse)
-# - task_body: 사용자가 보낸 데이터 요청 본문
-# - TaskCreate: 사용자가 보낸 데이터(title만 포함됨)
-# - taskCreateResponse: 응답할 떄 포함할 데이터(id 포함)
+# 위 줄은 "이 API는 POST 방식으로 /tasks 주소를 처리한다" 는 의미입니다.
+# - response_model은 FastAPI가 자동으로 응답 형식을 만들어주도록 하는 옵션입니다.
+#   즉, 이 API가 반환하는 응답이 TaskCreateResponse 형식임을 알려주는 것입니다.
+
+
+# 아래는 실제 실행될 함수입니다.
+# - task_body: 사용자가 보낸 JSON 데이터 > {"title": "책 읽기"}처럼 생김
+#              이 데이터는 task_schema.TaskCreate라는 데이터 형식으로 검사됩니다.
+# - db: 데이터베이스와 연결된 세션입니다.
+#       Depends(get_db)를 통해 FastAPI가 자동으로 db 연결을 준비해줍니다.
 async def create_task(
-    task_body: task_schema.TaskCreate, db: AsyncSession = Depends(get_db)
+    task_body: task_schema.TaskCreate,  # 요청 데이터 (제목 하나만 포함됨)
+    db: AsyncSession = Depends(get_db),  # DB 연결 세션 (FastAPI가 자동으로 준비)
 ):
+    # --------------------------------------------------------
+    # 실제로 할 일을 DB에 저장하는 부분입니다.
+    # - task_crud.create_task 함수에 db 세션과 요청 데이터를 전달합니다.
+    # - 결과로 저장된 Task 객체를 다시 반환합니다. (id 포함)
+    # --------------------------------------------------------
     return await task_crud.create_task(db, task_body)
-    # * DB에 새 Task를 저장하고, id가 포함된 응답 데이터를 반환함
 
 
 # ----------------------------------------------------------------

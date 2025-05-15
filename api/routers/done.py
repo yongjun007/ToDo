@@ -43,7 +43,7 @@ router = APIRouter()
 # - 요청 주소: /tasks/3/done
 #   (3번 할 일을 완료로 표시한다는 의미)
 # -------------------------------------------------------
-@router.put("/tasks{task_id}/done", response_model=done_schema.DoneResponse)
+@router.put("/tasks/{task_id}/done", response_model=done_schema.DoneResponse)
 # task_id는 URL에서 전달받은 숫자 (예: 3번 할 일)
 # db는 비동기 DB 세션, Depends를 통해 자동으로 주입됨
 async def mark_task_as_done(task_id: int, db: AsyncSession = Depends(get_db)):
